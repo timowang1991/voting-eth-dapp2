@@ -6,94 +6,48 @@ import { default as Web3 } from 'web3'
 import { default as contract } from 'truffle-contract'
 
 // Import our contract artifacts and turn them into usable abstractions.
-import metaCoinArtifact from '../../build/contracts/MetaCoin.json'
+import votingArtifacts from '../../build/contracts/Voting.json'
 
-// MetaCoin is our usable abstraction, which we'll use through the code below.
-const MetaCoin = contract(metaCoinArtifact)
+// Voting is our usable abstraction, which we'll use through the code below.
+const Voting = contract(votingArtifacts)
 
-// The following code is simple to show off interacting with your contracts.
-// As your needs grow you will likely need to change its form and structure.
-// For application bootstrapping, check out window.addEventListener below.
-let accounts
-let account
-
-const App = {
-  start: function () {
-    const self = this
-
-    // Bootstrap the MetaCoin abstraction for Use.
-    MetaCoin.setProvider(web3.currentProvider)
-
-    // Get the initial account balance so it can be displayed.
-    web3.eth.getAccounts(function (err, accs) {
-      if (err != null) {
-        alert('There was an error fetching your accounts.')
-        return
-      }
-
-      if (accs.length === 0) {
-        alert("Couldn't get any accounts! Make sure your Ethereum client is configured correctly.")
-        return
-      }
-
-      accounts = accs
-      account = accounts[0]
-
-      self.refreshBalance()
-    })
-  },
-
-  setStatus: function (message) {
-    const status = document.getElementById('status')
-    status.innerHTML = message
-  },
-
-  refreshBalance: function () {
-    const self = this
-
-    let meta
-    MetaCoin.deployed().then(function (instance) {
-      meta = instance
-      return meta.getBalance.call(account, { from: account })
-    }).then(function (value) {
-      const balanceElement = document.getElementById('balance')
-      balanceElement.innerHTML = value.valueOf()
-    }).catch(function (e) {
-      console.log(e)
-      self.setStatus('Error getting balance; see log.')
-    })
-  },
-
-  sendCoin: function () {
-    const self = this
-
-    const amount = parseInt(document.getElementById('amount').value)
-    const receiver = document.getElementById('receiver').value
-
-    this.setStatus('Initiating transaction... (please wait)')
-
-    let meta
-    MetaCoin.deployed().then(function (instance) {
-      meta = instance
-      return meta.sendCoin(receiver, amount, { from: account })
-    }).then(function () {
-      self.setStatus('Transaction complete!')
-      self.refreshBalance()
-    }).catch(function (e) {
-      console.log(e)
-      self.setStatus('Error sending coin; see log.')
-    })
-  }
+let candidates = {
+  Rama: 'candidate-1',
+  Nick: 'candidate-2',
+  Jose: 'candidate-3'
 }
 
-window.App = App
+window.voteForCandidate = function () {
+  let candidateName = document.getElementById('candidate').value
+
+  try {
+    document.getElementById('msg').innerHTML = 'Vote has been submitted. The vote count will increment ' +
+      'as soon as the vote is recorded on the blockchain.Please wait.'
+    document.getElementById('candidate').innerHTML = ''
+
+    Voting.deployed().then(function (contractInstance) {
+      contractInstance.voteForCandidate(candidateName, {
+        gas: 140000,
+        from: '0x14eEf087297392f9988d76B1ee4855386A48C0D1'
+      }).then(function () {
+        let divId = candidates[candidateName]
+        return contractInstance.totalVotesFor.call(candidateName).then(function (v) {
+          document.getElementById(divId).innerHTML = v.toString()
+          document.getElementById('msg').innerHTML = ''
+        })
+      })
+    })
+  } catch (err) {
+    console.log(err)
+  }
+}
 
 window.addEventListener('load', function () {
   // Checking if Web3 has been injected by the browser (Mist/MetaMask)
   if (typeof web3 !== 'undefined') {
     console.warn(
       'Using web3 detected from external source.' +
-      ' If you find that your accounts don\'t appear or you have 0 MetaCoin,' +
+      ' If you find that your accounts don\'t appear or you have 0 Voting,' +
       ' ensure you\'ve configured that source properly.' +
       ' If using MetaMask, see the following link.' +
       ' Feel free to delete this warning. :)' +
@@ -103,14 +57,22 @@ window.addEventListener('load', function () {
     window.web3 = new Web3(web3.currentProvider)
   } else {
     console.warn(
-      'No web3 detected. Falling back to http://127.0.0.1:9545.' +
+      'No web3 detected. Falling back to http://127.0.0.1:8545.' +
       ' You should remove this fallback when you deploy live, as it\'s inherently insecure.' +
       ' Consider switching to Metamask for development.' +
       ' More info here: http://truffleframework.com/tutorials/truffle-and-metamask'
     )
     // fallback - use your fallback strategy (local node / hosted node + in-dapp id mgmt / fail)
-    window.web3 = new Web3(new Web3.providers.HttpProvider('http://127.0.0.1:9545'))
+    window.web3 = new Web3(new Web3.providers.HttpProvider('http://127.0.0.1:8545'))
   }
 
-  App.start()
+  Voting.setProvider(web3.currentProvider)
+  let candidateNames = Object.keys(candidates)
+  candidateNames.forEach((name) => {
+    Voting.deployed().then(function (contractInstance) {
+      contractInstance.totalVotesFor.call(name).then(function (v) {
+        document.getElementById(candidates[name]).innerHTML = v.toString()
+      })
+    })
+  })
 })
