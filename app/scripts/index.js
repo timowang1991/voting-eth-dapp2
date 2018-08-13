@@ -11,11 +11,7 @@ import votingArtifacts from '../../build/contracts/Voting.json'
 // Voting is our usable abstraction, which we'll use through the code below.
 const Voting = contract(votingArtifacts)
 
-let candidates = {
-  Rama: 'candidate-1',
-  Nick: 'candidate-2',
-  Jose: 'candidate-3'
-}
+let candidates = ['Rama', 'Nick', 'Jose']
 
 window.voteForCandidate = function () {
   let candidateName = document.getElementById('candidate').value
@@ -30,7 +26,7 @@ window.voteForCandidate = function () {
         gas: 140000,
         from: '0x14eEf087297392f9988d76B1ee4855386A48C0D1'
       }).then(function () {
-        let divId = candidates[candidateName]
+        let divId = candidateName
         return contractInstance.totalVotesFor.call(candidateName).then(function (v) {
           document.getElementById(divId).innerHTML = v.toString()
           document.getElementById('msg').innerHTML = ''
@@ -67,12 +63,19 @@ window.addEventListener('load', function () {
   }
 
   Voting.setProvider(web3.currentProvider)
-  let candidateNames = Object.keys(candidates)
-  candidateNames.forEach((name) => {
+
+  let tableElem = document.getElementById('candidate-table')
+
+  candidates.forEach((name) => {
     Voting.deployed().then(function (contractInstance) {
-      contractInstance.totalVotesFor.call(name).then(function (v) {
-        document.getElementById(candidates[name]).innerHTML = v.toString()
-      })
+      return contractInstance.totalVotesFor.call(name)
+    }).then(function (v) {
+      tableElem.innerHTML += `
+        <tr>
+          <td>${name}</td>
+          <td id="${name}">${v.toString()}</td>
+        </tr>
+      `
     })
   })
 })
